@@ -1,3 +1,4 @@
 .venv
 .vscode
-tmp4i25gqz1
+__pycache__
+.env
