@@ -1,8 +1,0 @@
-{
-    "dbt.enableNewLineagePanel": true,
-    "dbt.deferConfigPerProject": {
-        "analytics": {
-            "favorState": false
-        }
-    }
-}
