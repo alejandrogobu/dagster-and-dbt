@@ -1,10 +1,6 @@
 import base64
-
 import geopandas as gpd
 import pandas as pd
-import plotly.express as px
-import matplotlib.pyplot as plt
-import plotly.io as pio
 from dagster import AssetExecutionContext, AssetKey, MaterializeResult, MetadataValue, asset
 from dagster_duckdb import DuckDBResource
 from smart_open import open
@@ -99,57 +95,57 @@ def manhattan_stats(database: DuckDBResource):
         output_file.write(trips_by_zone.to_json())
 
 
-@asset(
-    deps=["location_metrics"],
-    compute_kind="DuckDB",
-)
-def airport_trips(database: DuckDBResource) -> MaterializeResult:
-    """
-        A chart of where trips from the airport go
-    """
+# @asset(
+#     deps=["location_metrics"],
+#     compute_kind="DuckDB",
+# )
+# def airport_trips(database: DuckDBResource) -> MaterializeResult:
+#     """
+#         A chart of where trips from the airport go
+#     """
 
-    query = """
-        select
-            zone,
-            destination_borough,
-            trips
-        from location_metrics
-        where from_airport
-    """
-    with database.get_connection() as conn:
-        airport_trips = conn.execute(query).fetch_df()
+#     query = """
+#         select
+#             zone,
+#             destination_borough,
+#             trips
+#         from location_metrics
+#         where from_airport
+#     """
+#     with database.get_connection() as conn:
+#         airport_trips = conn.execute(query).fetch_df()
 
-    # Plot bars
-    fig, ax = plt.subplots(figsize=(10, 6))
+#     # Plot bars
+#     fig, ax = plt.subplots(figsize=(10, 6))
 
-    # Group data by destination_borough and plot the bar chart
-    airport_trips.groupby(['zone', 'destination_borough']).sum()['trips'].unstack().plot(
-        kind='bar', stacked=True, ax=ax
-    )
+#     # Group data by destination_borough and plot the bar chart
+#     airport_trips.groupby(['zone', 'destination_borough']).sum()['trips'].unstack().plot(
+#         kind='bar', stacked=True, ax=ax
+#     )
 
-    # Customize the plot
-    ax.set_xlabel("Zone")
-    ax.set_ylabel("Number of Trips")
-    ax.set_title("Trips from Airport by Destination Borough")
-    ax.legend(title="Destination Borough")
+#     # Customize the plot
+#     ax.set_xlabel("Zone")
+#     ax.set_ylabel("Number of Trips")
+#     ax.set_title("Trips from Airport by Destination Borough")
+#     ax.legend(title="Destination Borough")
 
-    # Save the image
-    plt.savefig(constants.AIRPORT_TRIPS_FILE_PATH, format="png", bbox_inches="tight")
-    plt.close(fig)
+#     # Save the image
+#     plt.savefig(constants.AIRPORT_TRIPS_FILE_PATH, format="png", bbox_inches="tight")
+#     plt.close(fig)
 
-    # Convert the image data to base64
-    with open(constants.AIRPORT_TRIPS_FILE_PATH, "rb") as file:
-        image_data = file.read()
+#     # Convert the image data to base64
+#     with open(constants.AIRPORT_TRIPS_FILE_PATH, "rb") as file:
+#         image_data = file.read()
 
-     # Convert the image data to base64
-    base64_data = base64.b64encode(image_data).decode('utf-8')
-    md_content = f"![Image](data:image/jpeg;base64,{base64_data})"
+#      # Convert the image data to base64
+#     base64_data = base64.b64encode(image_data).decode('utf-8')
+#     md_content = f"![Image](data:image/jpeg;base64,{base64_data})"
 
-    return MaterializeResult(
-        metadata={
-            "preview": MetadataValue.md(md_content)
-        }
-    )
+#     return MaterializeResult(
+#         metadata={
+#             "preview": MetadataValue.md(md_content)
+#         }
+#     )
 
 # @asset(
 #     deps=[AssetKey(["manhattan", "manhattan_stats"])],

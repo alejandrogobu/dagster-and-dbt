@@ -19,6 +19,7 @@ setup(
         "smart_open",
         "boto3",
         "pyarrow",
+        "matplotlib>=3.10.0"
     ],
     extras_require={"dev": ["dagster-webserver", "pytest"]},
 )
