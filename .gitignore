@@ -2,3 +2,5 @@
 .vscode
 __pycache__
 .env
+dagster_and_dbt.egg-info
+tmpkd9rci5w
