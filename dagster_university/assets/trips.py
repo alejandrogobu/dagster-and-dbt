@@ -1,54 +1,15 @@
 from io import BytesIO
-
+import os
+import duckdb
 import pandas as pd
 import requests
 from dagster import AssetExecutionContext, MaterializeResult, MetadataValue, asset
 from dagster_duckdb import DuckDBResource
+from dagster_aws.s3 import S3Resource
 from smart_open import open
-
 from ..partitions import monthly_partition
 from ..resources import smart_open_config
 from . import constants
-
-
-@asset(
-    group_name="raw_files",
-    compute_kind="Python",
-)
-def taxi_zones_file() -> MaterializeResult:
-    """The raw CSV file for the taxi zones dataset. Sourced from the NYC Open Data portal."""
-    raw_taxi_zones = requests.get(
-        "https://data.cityofnewyork.us/api/views/755u-8jsi/rows.csv?accessType=DOWNLOAD"
-    )
-
-    with open(
-        constants.TAXI_ZONES_FILE_PATH, "wb", transport_params=smart_open_config
-    ) as output_file:
-        output_file.write(raw_taxi_zones.content)
-
-    num_rows = len(pd.read_csv(BytesIO(raw_taxi_zones.content)))
-    return MaterializeResult(metadata={"Number of records": MetadataValue.int(num_rows)})
-
-
-@asset(
-    group_name="ingested",
-    compute_kind="DuckDB",
-)
-def taxi_zones(context: AssetExecutionContext, database: DuckDBResource):
-    """The raw taxi zones dataset, loaded into a DuckDB database."""
-    query = f"""
-        create or replace table zones as (
-            select
-                LocationID as zone_id,
-                zone,
-                borough,
-                the_geom as geometry
-            from '{constants.TAXI_ZONES_FILE_PATH}'
-        );
-    """
-
-    with database.get_connection() as conn:
-        conn.execute(query)
 
 
 @asset(
@@ -56,25 +17,32 @@ def taxi_zones(context: AssetExecutionContext, database: DuckDBResource):
     group_name="raw_files",
     compute_kind="DuckDB",
 )
-def taxi_trips_file(context: AssetExecutionContext) -> MaterializeResult:
+def taxi_trips_file(context: AssetExecutionContext, r2: S3Resource) -> MaterializeResult:
     """The raw parquet files for the taxi trips dataset. Sourced from the NYC Open Data portal."""
-    partition_date_str = context.partition_key
-    month_to_fetch = partition_date_str[:-3]
 
-    raw_trips = requests.get(
+    # Obtener la fecha de la partición
+    partition_date_str = context.partition_key
+    month_to_fetch = partition_date_str[:-3]  # Formato YYYY-MM
+
+    # Descargar el archivo Parquet
+    response = requests.get(
         f"https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_{month_to_fetch}.parquet"
     )
+    response.raise_for_status()  # Asegurarse de que la solicitud fue exitosa
 
-    with open(
-        constants.TAXI_TRIPS_TEMPLATE_FILE_PATH.format(month_to_fetch),
-        "wb",
-        transport_params=smart_open_config,
-    ) as output_file:
-        output_file.write(raw_trips.content)
+    # Guardar el archivo localmente
+    local_file_path = constants.TAXI_TRIPS_TEMPLATE_FILE_PATH.format(month_to_fetch)
+    with open(local_file_path, "wb") as output_file:
+        output_file.write(response.content)
 
-    num_rows = len(pd.read_parquet(BytesIO(raw_trips.content)))
+    # Subir el archivo a R2 usando el recurso S3
+    s3_client = r2.get_client()
+    s3_client.upload_file(local_file_path, "cityofnewyork", f"taxi_trips_{month_to_fetch}.parquet")
+
+    # Leer datos y contar filas
+    num_rows = len(pd.read_parquet(BytesIO(response.content)))
+
     return MaterializeResult(metadata={"Number of records": MetadataValue.int(num_rows)})
-
 
 @asset(
     deps=["taxi_trips_file"],
@@ -82,27 +50,72 @@ def taxi_trips_file(context: AssetExecutionContext) -> MaterializeResult:
     group_name="ingested",
     compute_kind="DuckDB",
 )
-def taxi_trips(context: AssetExecutionContext, database: DuckDBResource):
-    """The raw taxi trips dataset, loaded into a DuckDB database, partitioned by month."""
+def taxi_trips(context: AssetExecutionContext):
+    """El conjunto de datos de viajes en taxi, cargado en una base de datos MotherDuck, particionado por mes."""
     partition_date_str = context.partition_key
-    month_to_fetch = partition_date_str[:-3]
+    month_to_fetch = partition_date_str[:-3]  # YYYY-MM
 
-    query = f"""
-        create table if not exists trips (
-            vendor_id integer, pickup_zone_id integer, dropoff_zone_id integer,
-            rate_code_id double, payment_type integer, dropoff_datetime timestamp,
-            pickup_datetime timestamp, trip_distance double, passenger_count double,
-            total_amount double, partition_date varchar
-        );
+    # Obtener el token de acceso desde la variable de entorno
+    motherduck_token = os.getenv('MOTHERDUCK_TOKEN')
+    if not motherduck_token:
+        raise ValueError("El token de MotherDuck no está definido en las variables de entorno.")
 
-        delete from trips where partition_date = '{month_to_fetch}';
+    # Establecer la conexión con MotherDuck utilizando el token
+    conn = duckdb.connect(f"md:my_db?motherduck_token={motherduck_token}")
     
-        insert into trips
-        select
-            VendorID, PULocationID, DOLocationID, RatecodeID, payment_type, tpep_dropoff_datetime, 
-            tpep_pickup_datetime, trip_distance, passenger_count, total_amount, '{month_to_fetch}' as partition_date
-        from '{constants.TAXI_TRIPS_TEMPLATE_FILE_PATH.format(month_to_fetch)}';
+    file_path = f"r2://cityofnewyork/taxi_trips_{month_to_fetch}.parquet"
+    query = f"""
+        CREATE TABLE IF NOT EXISTS trips (
+            vendor_id INTEGER,
+            pickup_zone_id INTEGER,
+            dropoff_zone_id INTEGER,
+            rate_code_id DOUBLE,
+            payment_type INTEGER,
+            dropoff_datetime TIMESTAMP,
+            pickup_datetime TIMESTAMP,
+            trip_distance DOUBLE,
+            passenger_count DOUBLE,
+            total_amount DOUBLE,
+            partition_date VARCHAR
+        );
+            DELETE FROM trips WHERE partition_date = '{month_to_fetch}';
+
+        INSERT INTO trips
+        SELECT
+            VendorID,
+            PULocationID,
+            DOLocationID,
+            RatecodeID,
+            payment_type,
+            tpep_dropoff_datetime,
+            tpep_pickup_datetime,
+            trip_distance,
+            passenger_count,
+            total_amount,
+            '{month_to_fetch}' AS partition_date
+        FROM '{file_path}';
     """
 
-    with database.get_connection() as conn:
-        conn.execute(query)
+    # Ejecutar la consulta
+    conn.execute(query)
+
+    # Cerrar la conexión
+    conn.close()
+
+
+        #     DELETE FROM trips WHERE partition_date = '{month_to_fetch}';
+
+        # INSERT INTO trips
+        # SELECT
+        #     VendorID,
+        #     PULocationID,
+        #     DOLocationID,
+        #     RatecodeID,
+        #     payment_type,
+        #     tpep_dropoff_datetime,
+        #     tpep_pickup_datetime,
+        #     trip_distance,
+        #     passenger_count,
+        #     total_amount,
+        #     '{month_to_fetch}' AS partition_date
+        # FROM '{constants.TAXI_TRIPS_TEMPLATE_FILE_PATH.format(month_to_fetch)}';

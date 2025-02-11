@@ -1,9 +1,9 @@
 import os
-
 import boto3
 from dagster import EnvVar
 from dagster_duckdb import DuckDBResource
 from dagster_dbt import DbtCliResource
+from dagster_aws.s3 import S3Resource
 from ..project import dbt_project
 
 database_resource = DuckDBResource(
@@ -22,4 +22,11 @@ else:
 
 dbt_resource = DbtCliResource(
     project_dir=dbt_project,
+)
+
+r2_resource = S3Resource(
+    endpoint_url=f'https://{os.getenv("R2_ACCOUNT_ID")}.r2.cloudflarestorage.com',
+    region_name=os.getenv("R2_REGION_NAME"),
+    aws_access_key_id=os.getenv("R2_AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.getenv("R2_AWS_SECRET_ACCESS_KEY"),
 )
