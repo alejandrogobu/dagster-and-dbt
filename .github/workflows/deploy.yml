@@ -15,7 +15,6 @@ env:
   ENABLE_FAST_DEPLOYS: 'true'
   PYTHON_VERSION: '3.10'
   DAGSTER_CLOUD_FILE: 'dagster_cloud.yaml'
-  DBT_TARGET: 'prod'
 
 jobs:
   dagster_cloud_default_deploy:
