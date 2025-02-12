@@ -50,19 +50,11 @@ def taxi_trips_file(context: AssetExecutionContext, r2: S3Resource) -> Materiali
     group_name="ingested",
     compute_kind="DuckDB",
 )
-def taxi_trips(context: AssetExecutionContext):
+def taxi_trips(context: AssetExecutionContext, database:DuckDBResource):
     """El conjunto de datos de viajes en taxi, cargado en una base de datos MotherDuck, particionado por mes."""
     partition_date_str = context.partition_key
     month_to_fetch = partition_date_str[:-3]  # YYYY-MM
 
-    # Obtener el token de acceso desde la variable de entorno
-    motherduck_token = os.getenv('MOTHERDUCK_TOKEN')
-    if not motherduck_token:
-        raise ValueError("El token de MotherDuck no está definido en las variables de entorno.")
-
-    # Establecer la conexión con MotherDuck utilizando el token
-    conn = duckdb.connect(f"md:my_db?motherduck_token={motherduck_token}")
-    
     file_path = f"r2://cityofnewyork/taxi_trips_{month_to_fetch}.parquet"
     query = f"""
         CREATE TABLE IF NOT EXISTS trips (
@@ -97,25 +89,5 @@ def taxi_trips(context: AssetExecutionContext):
     """
 
     # Ejecutar la consulta
-    conn.execute(query)
-
-    # Cerrar la conexión
-    conn.close()
-
-
-        #     DELETE FROM trips WHERE partition_date = '{month_to_fetch}';
-
-        # INSERT INTO trips
-        # SELECT
-        #     VendorID,
-        #     PULocationID,
-        #     DOLocationID,
-        #     RatecodeID,
-        #     payment_type,
-        #     tpep_dropoff_datetime,
-        #     tpep_pickup_datetime,
-        #     trip_distance,
-        #     passenger_count,
-        #     total_amount,
-        #     '{month_to_fetch}' AS partition_date
-        # FROM '{constants.TAXI_TRIPS_TEMPLATE_FILE_PATH.format(month_to_fetch)}';
+    with database.get_connection() as conn:
+        conn.execute(query)

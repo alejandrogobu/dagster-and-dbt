@@ -10,11 +10,12 @@ database_resource = DuckDBResource(
     database=EnvVar("DUCKDB_DATABASE"),
 )
 
+
 if os.getenv("DAGSTER_ENVIRONMENT") == "prod":
     session = boto3.Session(
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-        region_name=os.getenv("AWS_REGION"),
+        aws_access_key_id=EnvVar("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=EnvVar("AWS_SECRET_ACCESS_KEY"),
+        region_name=EnvVar("AWS_REGION"),
     )
     smart_open_config = {"client": session.client("s3")}
 else:
@@ -25,8 +26,8 @@ dbt_resource = DbtCliResource(
 )
 
 r2_resource = S3Resource(
-    endpoint_url=f'https://{os.getenv("R2_ACCOUNT_ID")}.r2.cloudflarestorage.com',
-    region_name=os.getenv("R2_REGION_NAME"),
-    aws_access_key_id=os.getenv("R2_AWS_ACCESS_KEY_ID"),
-    aws_secret_access_key=os.getenv("R2_AWS_SECRET_ACCESS_KEY"),
+    endpoint_url=EnvVar("R2_ENDPOINT"),
+    region_name=EnvVar("R2_REGION_NAME"),
+    aws_access_key_id=EnvVar("R2_AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=EnvVar("R2_AWS_SECRET_ACCESS_KEY"),
 )
