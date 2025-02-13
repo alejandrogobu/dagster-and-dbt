@@ -2,7 +2,7 @@ version: 2
 
 sources:
   - name: raw_taxis
-    schema: main
+    schema: raw
     tables:
       - name: trips
         meta:
