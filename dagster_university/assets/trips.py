@@ -11,45 +11,6 @@ from ..resources import smart_open_config
 from . import constants
 
 
-@asset(
-    group_name="raw_files",
-    compute_kind="Python",
-)
-def taxi_zones_file() -> MaterializeResult:
-    """The raw CSV file for the taxi zones dataset. Sourced from the NYC Open Data portal."""
-    raw_taxi_zones = requests.get(
-        "https://data.cityofnewyork.us/api/views/755u-8jsi/rows.csv?accessType=DOWNLOAD"
-    )
-
-    with open(
-        constants.TAXI_ZONES_FILE_PATH, "wb", transport_params=smart_open_config
-    ) as output_file:
-        output_file.write(raw_taxi_zones.content)
-
-    num_rows = len(pd.read_csv(BytesIO(raw_taxi_zones.content)))
-    return MaterializeResult(metadata={"Number of records": MetadataValue.int(num_rows)})
-
-
-@asset(
-    group_name="ingested",
-    compute_kind="DuckDB",
-)
-def taxi_zones(context: AssetExecutionContext, database: DuckDBResource):
-    """The raw taxi zones dataset, loaded into a DuckDB database."""
-    query = f"""
-        create or replace table zones as (
-            select
-                LocationID as zone_id,
-                zone,
-                borough,
-                the_geom as geometry
-            from '{constants.TAXI_ZONES_FILE_PATH}'
-        );
-    """
-
-    with database.get_connection() as conn:
-        conn.execute(query)
-
 
 @asset(
     partitions_def=monthly_partition,
