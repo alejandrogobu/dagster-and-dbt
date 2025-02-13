@@ -15,7 +15,7 @@ from dagster_aws.s3 import S3Resource
 @asset(
     partitions_def=monthly_partition,
     group_name="raw_files",
-    compute_kind="DuckDB",
+    compute_kind="Python",
 )
 def taxi_trips_file(context: AssetExecutionContext, r2: S3Resource) -> MaterializeResult:
     """Fetch NYC taxi trip data, count rows, and upload it directly to R2 without saving locally."""
@@ -59,7 +59,7 @@ def taxi_trips(context: AssetExecutionContext, database:DuckDBResource):
     bucket_name = os.getenv("R2_BUCKET")
     file_path = f"r2://{bucket_name}/taxi_trips_{month_to_fetch}.parquet"
     query = f"""
-        CREATE TABLE IF NOT EXISTS trips (
+        CREATE TABLE IF NOT EXISTS raw.trips (
             vendor_id INTEGER,
             pickup_zone_id INTEGER,
             dropoff_zone_id INTEGER,
@@ -73,9 +73,9 @@ def taxi_trips(context: AssetExecutionContext, database:DuckDBResource):
             partition_date VARCHAR
         );
 
-        DELETE FROM trips WHERE partition_date = '{month_to_fetch}';
+        DELETE FROM raw.trips WHERE partition_date = '{month_to_fetch}';
 
-        INSERT INTO trips
+        INSERT INTO raw.trips
         SELECT
             VendorID,
             PULocationID,
