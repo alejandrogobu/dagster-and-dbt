@@ -1,12 +1,16 @@
 from io import BytesIO
 import pandas as pd
 import requests
-from dagster import AssetExecutionContext, MaterializeResult, MetadataValue, asset
+from dagster import AssetExecutionContext, MaterializeResult, MetadataValue, asset, EnvVar
 from dagster_duckdb import DuckDBResource
 from dagster_aws.s3 import S3Resource
-from smart_open import open
 from ..partitions import monthly_partition
-from . import constants
+import os
+import requests
+import pandas as pd
+from io import BytesIO
+from dagster import MetadataValue, MaterializeResult, AssetExecutionContext
+from dagster_aws.s3 import S3Resource
 
 @asset(
     partitions_def=monthly_partition,
@@ -14,7 +18,7 @@ from . import constants
     compute_kind="DuckDB",
 )
 def taxi_trips_file(context: AssetExecutionContext, r2: S3Resource) -> MaterializeResult:
-    """The raw parquet files for the taxi trips dataset. Sourced from the NYC Open Data portal."""
+    """Fetch NYC taxi trip data, count rows, and upload it directly to R2 without saving locally."""
 
     # Obtener la fecha de la partición
     partition_date_str = context.partition_key
@@ -24,19 +28,20 @@ def taxi_trips_file(context: AssetExecutionContext, r2: S3Resource) -> Materiali
     response = requests.get(
         f"https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_{month_to_fetch}.parquet"
     )
-    response.raise_for_status()  # Asegurarse de que la solicitud fue exitosa
+    response.raise_for_status()  # Asegurar que la solicitud fue exitosa
 
-    # Guardar el archivo localmente
-    local_file_path = constants.TAXI_TRIPS_TEMPLATE_FILE_PATH.format(month_to_fetch)
-    with open(local_file_path, "wb") as output_file:
-        output_file.write(response.content)
+    # Crear un objeto BytesIO para manejar el archivo en memoria
+    parquet_data = BytesIO(response.content)
 
-    # Subir el archivo a R2 usando el recurso S3
+    # Contar registros sin escribir en disco
+    num_rows = len(pd.read_parquet(parquet_data))
+
+    # **Reiniciar el cursor antes de subirlo a R2**
+    parquet_data.seek(0)
+
+    # Subir el archivo a R2 directamente desde memoria
     s3_client = r2.get_client()
-    s3_client.upload_file(local_file_path, "cityofnewyork", f"taxi_trips_{month_to_fetch}.parquet")
-
-    # Leer datos y contar filas
-    num_rows = len(pd.read_parquet(BytesIO(response.content)))
+    s3_client.upload_fileobj(parquet_data, os.getenv("R2_BUCKET"), f"taxi_trips_{month_to_fetch}.parquet")
 
     return MaterializeResult(metadata={"Number of records": MetadataValue.int(num_rows)})
 
@@ -51,8 +56,8 @@ def taxi_trips(context: AssetExecutionContext, database:DuckDBResource):
     """El conjunto de datos de viajes en taxi, cargado en una base de datos MotherDuck, particionado por mes."""
     partition_date_str = context.partition_key
     month_to_fetch = partition_date_str[:-3]  # YYYY-MM
-
-    file_path = f"r2://cityofnewyork/taxi_trips_{month_to_fetch}.parquet"
+    bucket_name = os.getenv("R2_BUCKET")
+    file_path = f"r2://{bucket_name}/taxi_trips_{month_to_fetch}.parquet"
     query = f"""
         CREATE TABLE IF NOT EXISTS trips (
             vendor_id INTEGER,
@@ -67,7 +72,8 @@ def taxi_trips(context: AssetExecutionContext, database:DuckDBResource):
             total_amount DOUBLE,
             partition_date VARCHAR
         );
-            DELETE FROM trips WHERE partition_date = '{month_to_fetch}';
+
+        DELETE FROM trips WHERE partition_date = '{month_to_fetch}';
 
         INSERT INTO trips
         SELECT
