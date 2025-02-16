@@ -1,7 +1,13 @@
 import os
+from datetime import datetime, timezone
+
+DATE_FORMAT = "%Y-%m-%d"
+
+START_DATE = "2025-01-01"
+TODAY_DATE = datetime.now(timezone.utc)
+END_DATE = TODAY_DATE.strftime("%Y-%m-%d")
 
 S3_BUCKET_PREFIX = os.getenv("S3_BUCKET_PREFIX", "s3://dagster-university/")
-
 
 def get_path_for_env(path: str) -> str:
     """A utility method for Dagster University. Generates a path based on the environment.
@@ -36,10 +42,5 @@ MANHATTAN_STATS_FILE_PATH = get_path_for_env(
 MANHATTAN_MAP_FILE_PATH = get_path_for_env(os.path.join("data", "outputs", "manhattan_map.png"))
 
 REQUEST_DESTINATION_TEMPLATE_FILE_PATH = get_path_for_env(os.path.join("data", "outputs", "{}.png"))
-
-DATE_FORMAT = "%Y-%m-%d"
-
-START_DATE = "2023-01-01"
-END_DATE = "2023-04-01"
 
 AIRPORT_TRIPS_FILE_PATH = get_path_for_env(os.path.join("data", "outputs", "airport_trips.png"))

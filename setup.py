@@ -20,7 +20,9 @@ setup(
         "boto3",
         "pyarrow",
         "matplotlib>=3.10.0",
-        "dagster-aws>=0.25.11"
+        "dagster-aws>=0.25.11",
+        "dagster-dlt>=0.25.11",
+        "dlt[duckdb]>=1.6.1"
     ],
     extras_require={"dev": ["dagster-webserver", "pytest"]},
 )
