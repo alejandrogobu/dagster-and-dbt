@@ -1,12 +1,13 @@
 from dagster import AssetSelection, define_asset_job
 from dagster_dbt import build_dbt_asset_selection
-from ..assets.dbt import dbt_analytics
-from ..partitions import monthly_partition
+from ..assets.dbt import incremental_dbt_models
+from ..partitions import daily_partition
 
-dbt_trips_selection = build_dbt_asset_selection([dbt_analytics], "stg_trips").downstream()
-trips= AssetSelection.assets("taxi_trips_file","taxi_trips")
-trip_update_job = define_asset_job(
-    name="trip_update_job",
-    partitions_def=monthly_partition,
-    selection=trips
+
+chicago_crimes_extract= AssetSelection.assets("dlt_chicago_crimes_source_get_crimes")
+dbt_chicago_crimes = build_dbt_asset_selection([incremental_dbt_models], "stg_chicago_crimes").downstream()
+chicago_crimes_update_job = define_asset_job(
+    name="chicago_crimes_update_job",
+    partitions_def=daily_partition,
+    selection=chicago_crimes_extract | dbt_chicago_crimes
 )

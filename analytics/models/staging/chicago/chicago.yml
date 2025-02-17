@@ -1,0 +1,90 @@
+models:
+  - name: stg_chicago_crimes
+    config:
+      meta:
+        dagster:
+          group: chicago
+    description: Incremental model for Chicago crime data sourced from the City of Chicago Open Data Portal.
+    columns:
+      - name: id
+        data_type: varchar
+        description: Unique identifier for the crime report.
+        data_tests:
+          - not_null
+      - name: case_number
+        data_type: varchar
+        description: Case number assigned by the Chicago Police Department.
+        data_tests:
+          - not_null
+      - name: date
+        data_type: timestamp with time zone
+        description: Date and time when the crime occurred.
+      - name: block
+        data_type: varchar
+        description: Block address where the crime took place.
+      - name: iucr
+        data_type: varchar
+        description: Illinois Uniform Crime Reporting (IUCR) code for the offense.
+      - name: primary_type
+        data_type: varchar
+        description: Broad category of the crime (e.g., THEFT, ASSAULT, HOMICIDE).
+      - name: description
+        data_type: varchar
+        description: Detailed description of the crime type.
+      - name: location_description
+        data_type: varchar
+        description: Specific location type where the crime occurred (e.g., STREET, ALLEY, PARKING LOT).
+      - name: arrest
+        data_type: boolean
+        description: Indicates whether an arrest was made (TRUE or FALSE).
+      - name: domestic
+        data_type: boolean
+        description: Indicates if the crime was related to domestic violence (TRUE or FALSE).
+      - name: beat
+        data_type: varchar
+        description: Police beat where the crime occurred (smallest geographic unit for police patrols).
+      - name: district
+        data_type: varchar
+        description: Police district responsible for the area where the crime occurred.
+      - name: ward
+        data_type: varchar
+        description: City council ward where the crime occurred.
+      - name: community_area
+        data_type: varchar
+        description: Community area number where the crime was recorded.
+      - name: fbi_code
+        data_type: varchar
+        description: FBI-assigned crime classification code.
+      - name: x_coordinate
+        data_type: varchar
+        description: X-coordinate of the crime location in the State Plane projection.
+      - name: y_coordinate
+        data_type: varchar
+        description: Y-coordinate of the crime location in the State Plane projection.
+      - name: year
+        data_type: varchar
+        description: Year in which the crime occurred.
+      - name: updated_on
+        data_type: timestamp with time zone
+        description: Date and time when the record was last updated.
+      - name: latitude
+        data_type: varchar
+        description: Latitude of the crime location.
+      - name: longitude
+        data_type: varchar
+        description: Longitude of the crime location.
+      - name: location__latitude
+        data_type: varchar
+        description: Extracted latitude from the location field.
+      - name: location__longitude
+        data_type: varchar
+        description: Extracted longitude from the location field.
+      - name: location__human_address
+        data_type: varchar
+        description: Human-readable address of the crime location.
+      - name: _dlt_load_id
+        data_type: varchar
+        description: Unique identifier for the dlt pipeline load.
+      - name: _dlt_id
+        data_type: varchar
+        description: Internal unique ID assigned by dlt for tracking.

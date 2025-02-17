@@ -1,7 +1,7 @@
 from dagster import ScheduleDefinition
-from ..jobs import trip_update_job
+from ..jobs import chicago_crimes_update_job
 
-trip_update_schedule = ScheduleDefinition(
-    job=trip_update_job,
-    cron_schedule="0 0 5 * *",  # every 5th of the month at midnight
+chicago_update_schedule = ScheduleDefinition(
+    job=chicago_crimes_update_job,
+    cron_schedule="1 0 * * *",  # Runs every day at 00:01
 )
