@@ -1,6 +1,3 @@
-import os
-
-import boto3
 from dagster import EnvVar
 from dagster_duckdb import DuckDBResource
 from dagster_dbt import DbtCliResource

@@ -1,5 +1,5 @@
-from dagster import AssetExecutionContext,AssetKey
-from dagster_dbt import dbt_assets, DbtCliResource, DagsterDbtTranslator
+from dagster import AssetExecutionContext, asset
+from dagster_dbt import dbt_assets, DbtCliResource, get_asset_key_for_source
 from ..partitions import daily_partition
 import json
 from datetime import datetime, timedelta
@@ -27,7 +27,7 @@ from ..project import dbt_project
 
 @dbt_assets(
     manifest=dbt_project.manifest_path,
-    select=INCREMENTAL_SELECTOR,     # select only models with INCREMENTAL_SELECTOR
+    select=f"{INCREMENTAL_SELECTOR}",     # select only models with INCREMENTAL_SELECTOR
     partitions_def=daily_partition,   # partition those models using daily_partition
 )
 def incremental_dbt_models(context: AssetExecutionContext, dbt: DbtCliResource):
@@ -45,6 +45,12 @@ def incremental_dbt_models(context: AssetExecutionContext, dbt: DbtCliResource):
         "min_date": date_start_iso,
         "max_date": date_end_iso
     }
-    yield from dbt.cli(
+    yield from (dbt.cli(
         ["build", "--vars", json.dumps(dbt_vars)], context=context
-    ).stream()
+    ).stream())
+
+# # Define a dbt source as a Dagster asset
+# @asset(
+#     key=get_asset_key_for_source([incremental_dbt_models], "chicago_crimes"))
+# def source_crimes():
+#     return None 

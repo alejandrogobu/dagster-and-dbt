@@ -1,7 +1,8 @@
-from dagster import ScheduleDefinition
+from dagster import ScheduleDefinition, build_schedule_from_partitioned_job
 from ..jobs import chicago_crimes_update_job
 
-chicago_update_schedule = ScheduleDefinition(
+chicago_update_schedule = build_schedule_from_partitioned_job(
     job=chicago_crimes_update_job,
-    cron_schedule="1 0 * * *",  # Runs every day at 00:01
+    hour_of_day=22,
+    minute_of_hour=00
 )

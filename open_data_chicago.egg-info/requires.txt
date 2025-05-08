@@ -1,0 +1,6 @@
+dagster>=1.9.11
+dagster-cloud>=1.9.11
+
+[dev]
+dagster-webserver
+pytest
